@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -24,12 +25,21 @@ func send(client *statsd.Client, cb *countBuffer,
 			if metricConf["change"] != "" {
 				old := cb.int64(name)
 				value -= old
+				if value < 0 {
+					value = 0
+				}
 			}
 			tags := getTag(metric.Label)
 			if err := client.Count(targetName, value, tags, 1); err != nil {
 				return err
 			}
 			cb.updateInt64(name, int64(*metric.Counter.Value))
+			slog.Debug("sending",
+				slog.String("targetName", targetName),
+				slog.String("type", "counter"),
+				slog.Int64("value", value),
+				slog.Any("tags", tags),
+			)
 		}
 	case dto.MetricType_GAUGE:
 		for _, metric := range metric.Metric {
@@ -38,12 +48,21 @@ func send(client *statsd.Client, cb *countBuffer,
 			if metricConf["change"] != "" {
 				old := cb.float64(name)
 				value -= old
+				if value < 0 {
+					value = 0
+				}
 			}
 			tags := getTag(metric.Label)
 			if err := client.Gauge(targetName, value, tags, 1); err != nil {
 				return err
 			}
 			cb.updateFloat64(name, *metric.Gauge.Value)
+			slog.Debug("sending",
+				slog.String("targetName", targetName),
+				slog.String("type", "gauge"),
+				slog.Float64("value", value),
+				slog.Any("tags", tags),
+			)
 		}
 	case dto.MetricType_HISTOGRAM:
 		// not implemented yet
@@ -130,8 +149,8 @@ func newCountBuffer(path string) (*countBuffer, error) {
 		}
 		for _, line := range strings.Split(string(data), "\n") {
 			s := strings.Fields(line)
-			if len(s) != 2 {
-				return nil, fmt.Errorf("countBuffer is collepted, %s", line)
+			if len(s) != 2 || line[0] == '#' {
+				continue
 			}
 			key := s[0]
 			cb.buf[key] = s[1]

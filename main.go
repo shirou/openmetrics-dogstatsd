@@ -11,13 +11,24 @@ import (
 )
 
 func main() {
-	handler := slog.NewJSONHandler(os.Stdout, nil)
-	slog.SetDefault(slog.New(handler))
-
 	var confPath string
 	flag.StringVar(&confPath, "conf", "./config.yaml", "config file path")
 	var dogAddr string
 	flag.StringVar(&dogAddr, "addr", "127.0.0.1:8125", "DogStatsD address")
+	var verbose bool
+	flag.BoolVar(&verbose, "v", false, "verbose logging")
+
+	flag.Parse()
+
+	lvl := slog.LevelInfo
+	if verbose {
+		lvl = slog.LevelDebug
+	}
+
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: lvl,
+	})
+	slog.SetDefault(slog.New(handler))
 
 	if err := run(confPath, dogAddr); err != nil {
 		slog.Error("run error", slog.Any("error", err))
@@ -51,6 +62,7 @@ func run(confPath, dogAddr string) error {
 		dogstatsdClient.SimpleServiceCheck(fmt.Sprintf("application.%s", instance.OpenMetricsEndpoint), 1)
 
 		bufFile := fmt.Sprintf("/tmp/openmetrics_buf-%d.txt", i)
+		slog.Debug("bufFile", slog.String("bufFile", bufFile))
 		cb, err := newCountBuffer(bufFile)
 		if err != nil {
 			return err
@@ -63,7 +75,6 @@ func run(confPath, dogAddr string) error {
 				if !exist {
 					continue
 				}
-
 				if err := send(dogstatsdClient, cb, targetName, metricConf, metric); err != nil {
 					slog.Error("send error", slog.Any("error", err))
 					// continue

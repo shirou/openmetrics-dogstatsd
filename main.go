@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/DataDog/datadog-go/statsd"
@@ -17,6 +19,8 @@ func main() {
 	flag.StringVar(&dogAddr, "addr", "127.0.0.1:8125", "DogStatsD address")
 	var verbose bool
 	flag.BoolVar(&verbose, "v", false, "verbose logging")
+	var daemon int
+	flag.IntVar(&daemon, "d", 0, "daemon mode with N second (default off)")
 
 	flag.Parse()
 
@@ -30,8 +34,39 @@ func main() {
 	})
 	slog.SetDefault(slog.New(handler))
 
+	if daemon > 0 {
+		if err := daemonize(confPath, dogAddr, daemon); err != nil {
+			slog.Error("run error", slog.Any("error", err))
+		}
+
+	} else {
+		if err := run(confPath, dogAddr); err != nil {
+			slog.Error("run error", slog.Any("error", err))
+		}
+	}
+}
+
+func daemonize(confPath, dogAddr string, interval int) error {
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	// first invocation
 	if err := run(confPath, dogAddr); err != nil {
 		slog.Error("run error", slog.Any("error", err))
+		return err
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if err := run(confPath, dogAddr); err != nil {
+				slog.Error("run error", slog.Any("error", err))
+				return err
+			}
+		}
 	}
 }
 

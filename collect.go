@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -25,6 +26,8 @@ type instance struct {
 }
 
 type metricConf map[string]string
+
+const metricReadTimeoutSec = 10
 
 func readConfig(path string) (*appConfig, error) {
 	var conf appConfig
@@ -68,7 +71,9 @@ func readEndpoint(ctx context.Context, urlStr string) ([]byte, error) {
 		return nil, fmt.Errorf("create request error: %w", err)
 	}
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: time.Duration(metricReadTimeoutSec) * time.Second,
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {

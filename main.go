@@ -21,6 +21,8 @@ func main() {
 	flag.BoolVar(&verbose, "v", false, "verbose logging")
 	var daemon int
 	flag.IntVar(&daemon, "d", 0, "daemon mode with N second (default off)")
+	var systemd bool
+	flag.BoolVar(&systemd, "systemd-service", false, "print systemd service file")
 
 	flag.Parse()
 
@@ -33,6 +35,13 @@ func main() {
 		Level: lvl,
 	})
 	slog.SetDefault(slog.New(handler))
+
+	if systemd {
+		if err := printSystemdService(); err != nil {
+			slog.Error("print systemd service error", slog.Any("error", err))
+		}
+		return
+	}
 
 	if daemon > 0 {
 		if err := daemonize(confPath, dogAddr, daemon); err != nil {

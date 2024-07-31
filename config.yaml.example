@@ -1,0 +1,17 @@
+instances:
+  - application_name: node_exporter
+    openmetrics_endpoint: http://localhost:9100/metrics
+    metrics:
+      - node_network_transmit_bytes_total: node.network.transmit.bytes_total
+        change: true
+      - node_network_receive_bytes_total: node.network.receive.bytes_total
+        change: true
+      - node_filesystem_free_bytes: node.fs.free_bytes
+      - promhttp_metric_handler_requests_total: node.promhttp.requests_count
+  - application_name: my_application
+    openmetrics_endpoint: http://localhost:8888/metrics
+    metrics:
+      - node_network_transmit_bytes_total: app.my_application.network.transmit.bytes_total
+        change: true
+      - node_network_receive_bytes_total: app.my_application.network.receive.bytes_total
+        change: true
